@@ -1,0 +1,213 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Customer Transactions Dashboard</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+</head>
+<body class="bg-gray-100 font-sans p-6">
+    <div class="max-w-6xl mx-auto space-y-6">
+        
+        <header class="bg-indigo-600 text-white p-6 rounded-lg shadow-md flex justify-between items-center">
+            <h1 class="text-2xl font-bold">Toucan Payments Dashboard</h1>
+            <button onclick="loadAllTransactions()" class="bg-indigo-700 hover:bg-indigo-800 text-white px-4 py-2 rounded text-sm transition">
+                Refresh All
+            </button>
+        </header>
+
+        <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
+            
+            <div class="bg-white p-6 rounded-lg shadow-md border border-gray-200 h-fit">
+                <h2 class="text-lg font-semibold mb-4 text-gray-800">New Transaction</h2>
+                <form id="transactionForm" onsubmit="createTransaction(event)" class="space-y-3">
+                    <div>
+                        <label class="block text-xs font-medium text-gray-600">Transaction ID</label>
+                        <input type="text" id="txId" required class="w-full mt-1 p-2 border rounded text-sm focus:ring-2 focus:ring-indigo-500 outline-none">
+                    </div>
+                    <div>
+                        <label class="block text-xs font-medium text-gray-600">Customer ID</label>
+                        <input type="text" id="custId" required class="w-full mt-1 p-2 border rounded text-sm focus:ring-2 focus:ring-indigo-500 outline-none">
+                    </div>
+                    <div class="grid grid-cols-2 gap-2">
+                        <div>
+                            <label class="block text-xs font-medium text-gray-600">Amount</label>
+                            <input type="number" step="0.01" id="amount" required class="w-full mt-1 p-2 border rounded text-sm focus:ring-2 focus:ring-indigo-500 outline-none">
+                        </div>
+                        <div>
+                            <label class="block text-xs font-medium text-gray-600">Currency</label>
+                            <input type="text" id="currency" value="USD" required class="w-full mt-1 p-2 border rounded text-sm focus:ring-2 focus:ring-indigo-500 outline-none">
+                        </div>
+                    </div>
+                    <div>
+                        <label class="block text-xs font-medium text-gray-600">Transaction Type</label>
+                        <select id="txType" class="w-full mt-1 p-2 border rounded text-sm focus:ring-2 focus:ring-indigo-500 outline-none">
+                            <option value="PAYMENT">PAYMENT</option>
+                            <option value="REFUND">REFUND</option>
+                            <option value="TRANSFER">TRANSFER</option>
+                        </select>
+                    </div>
+                    <button type="submit" class="w-full bg-indigo-600 hover:bg-indigo-700 text-white font-medium py-2 rounded text-sm transition">
+                        Submit Transaction
+                    </button>
+                </form>
+                <div id="formAlert" class="mt-3 text-xs hidden p-2 rounded"></div>
+            </div>
+
+            <div class="bg-white p-6 rounded-lg shadow-md border border-gray-200 md:col-span-2 space-y-4">
+                
+                <div class="flex justify-between items-center gap-2">
+                    <h2 class="text-lg font-semibold text-gray-800">Transactions List</h2>
+                    <div class="flex gap-2">
+                        <input type="text" id="searchCustId" placeholder="Filter by Customer ID" class="p-2 border rounded text-sm outline-none">
+                        <button onclick="searchByCustomer()" class="bg-gray-800 text-white px-3 py-1.5 rounded text-sm hover:bg-gray-900 transition">Filter</button>
+                    </div>
+                </div>
+
+                <div class="overflow-x-auto">
+                    <table class="w-full text-left border-collapse">
+                        <thead>
+                            <tr class="bg-gray-50 border-b text-xs text-gray-500 uppercase">
+                                <th class="p-3">TX ID</th>
+                                <th class="p-3">Customer</th>
+                                <th class="p-3">Amount</th>
+                                <th class="p-3">Type</th>
+                                <th class="p-3">Status</th>
+                                <th class="p-3 text-right">Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody id="transactionTable" class="text-sm divide-y">
+                            <tr>
+                                <td colspan="6" class="p-4 text-center text-gray-400">Loading transactions...</td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const API_BASE = '/api/transactions';
+
+        document.addEventListener('DOMContentLoaded', loadAllTransactions);
+
+        async function loadAllTransactions() {
+            try {
+                const res = await fetch(API_BASE);
+                const data = await res.json();
+                renderTable(data);
+            } catch (err) {
+                console.error(err);
+            }
+        }
+
+        async function searchByCustomer() {
+            const customerId = document.getElementById('searchCustId').value.trim();
+            if (!customerId) return loadAllTransactions();
+
+            try {
+                const res = await fetch(`${API_BASE}/customer/${customerId}`);
+                const data = await res.json();
+                renderTable(data);
+            } catch (err) {
+                console.error(err);
+            }
+        }
+
+        async function createTransaction(e) {
+            e.preventDefault();
+            
+            const payload = {
+                transactionId: document.getElementById('txId').value,
+                customerId: document.getElementById('custId').value,
+                amount: parseFloat(document.getElementById('amount').value),
+                currency: document.getElementById('currency').value,
+                transactionType: document.getElementById('txType').value
+            };
+
+            try {
+                const res = await fetch(API_BASE, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(payload)
+                });
+
+                const data = await res.json();
+
+                if (res.ok) {
+                    showAlert('Transaction created successfully!', 'bg-green-100 text-green-700');
+                    document.getElementById('transactionForm').reset();
+                    document.getElementById('currency').value = 'USD';
+                    loadAllTransactions();
+                } else {
+                    showAlert(data.message || 'Validation failed', 'bg-red-100 text-red-700');
+                }
+            } catch (err) {
+                showAlert('Error connecting to server', 'bg-red-100 text-red-700');
+            }
+        }
+
+        async function updateStatus(txId, status) {
+            try {
+                const res = await fetch(`${API_BASE}/${txId}/status?status=${status}`, { method: 'PATCH' });
+                if (res.ok) {
+                    loadAllTransactions();
+                } else {
+                    const err = await res.json();
+                    alert(err.message);
+                }
+            } catch (err) {
+                console.error(err);
+            }
+        }
+
+        function renderTable(transactions) {
+            const tbody = document.getElementById('transactionTable');
+            tbody.innerHTML = '';
+
+            if (!transactions || transactions.length === 0) {
+                tbody.innerHTML = `<tr><td colspan="6" class="p-4 text-center text-gray-400">No records found.</td></tr>`;
+                return;
+            }
+
+            transactions.forEach(tx => {
+                const statusBadge = getStatusBadge(tx.status);
+                const isPending = tx.status === 'PENDING';
+
+                const row = `
+                    <tr class="hover:bg-gray-50">
+                        <td class="p-3 font-medium text-gray-900">${tx.transactionId}</td>
+                        <td class="p-3 text-gray-600">${tx.customerId}</td>
+                        <td class="p-3 font-semibold">${tx.amount} ${tx.currency}</td>
+                        <td class="p-3"><span class="text-xs bg-gray-100 text-gray-600 px-2 py-1 rounded">${tx.transactionType}</span></td>
+                        <td class="p-3">${statusBadge}</td>
+                        <td class="p-3 text-right space-x-1">
+                            ${isPending ? `
+                                <button onclick="updateStatus('${tx.transactionId}', 'SUCCESS')" class="text-xs bg-emerald-500 hover:bg-emerald-600 text-white px-2 py-1 rounded">Approve</button>
+                                <button onclick="updateStatus('${tx.transactionId}', 'FAILED')" class="text-xs bg-rose-500 hover:bg-rose-600 text-white px-2 py-1 rounded">Reject</button>
+                            ` : '<span class="text-xs text-gray-400 italic">Immutable</span>'}
+                        </td>
+                    </tr>
+                `;
+                tbody.innerHTML += row;
+            });
+        }
+
+        function getStatusBadge(status) {
+            if (status === 'PENDING') return `<span class="bg-amber-100 text-amber-800 text-xs px-2.5 py-0.5 rounded-full font-medium">PENDING</span>`;
+            if (status === 'SUCCESS') return `<span class="bg-emerald-100 text-emerald-800 text-xs px-2.5 py-0.5 rounded-full font-medium">SUCCESS</span>`;
+            return `<span class="bg-rose-100 text-rose-800 text-xs px-2.5 py-0.5 rounded-full font-medium">FAILED</span>`;
+        }
+
+        function showAlert(msg, classes) {
+            const alertBox = document.getElementById('formAlert');
+            alertBox.className = `mt-3 text-xs p-2 rounded ${classes}`;
+            alertBox.innerText = msg;
+            alertBox.classList.remove('hidden');
+            setTimeout(() => alertBox.classList.add('hidden'), 4000);
+        }
+    </script>
+</body>
+</html>
